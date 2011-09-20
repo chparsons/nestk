@@ -34,11 +34,34 @@ namespace ntk
 
 class BodyEventDetector;
 
+class OpenniDriver
+{
+public:
+    OpenniDriver();
+    ~OpenniDriver();
+
+public:
+    xn::Context& niContext() { return m_ni_context; }
+    int numDevices() const { return m_device_nodes.size(); }
+    void checkXnError(const XnStatus& status, const char* what) const;
+
+private:
+    struct Config;
+    Config* m_config;
+
+private:
+    xn::Context m_ni_context;
+    std::vector<std::string> m_device_nodes;
+    XnLicense m_license;
+};
+
 class OpenniGrabber : public ntk::RGBDGrabber
 {
 public:
-    /*! Constructor. Camera_id is the device id, starting at 0. */
-    OpenniGrabber(int camera_id = 0);
+    /*!
+     * Constructor. camera_id specifies the camera, 0 is the first device.
+     */
+    OpenniGrabber(OpenniDriver& driver, int camera_id = 0);
 
     /*! set a new xml config file for the grabber
    * call it before initialize() */
@@ -69,6 +92,9 @@ public:
     /*! Set whether User and Body trackers are enabled. */
     void setTrackUsers(bool enable) { m_track_users = enable; }
 
+    /*! Grab IR images instead of RGB images. */
+    virtual void setIRMode(bool ir);
+
 public:
     // Nite accessors.
     xn::DepthGenerator& niDepthGenerator() { return m_ni_depth_generator; }
@@ -97,19 +123,17 @@ public:
     void calibrationFinishedCallback(XnUserID nId, bool success);
 
 private:
-    void check_error(const XnStatus& status, const char* what) const;
+    void waitAndUpdateActiveGenerators();
     void estimateCalibration();
 
 private:
-    struct Config;
-    Config* m_config;
-
-private:
+    OpenniDriver& m_driver;
     int m_camera_id;
     RGBDImage m_current_image;
-    xn::Context m_ni_context;
+    xn::Device m_ni_device;
     xn::DepthGenerator m_ni_depth_generator;
     xn::ImageGenerator m_ni_rgb_generator;
+    xn::IRGenerator m_ni_ir_generator;
     xn::UserGenerator m_ni_user_generator;
     xn::HandsGenerator m_ni_hands_generator;
     xn::GestureGenerator m_ni_gesture_generator;
@@ -129,8 +153,10 @@ private:
     std::string m_xml_config_file;
 
     bool m_track_users;
+    bool m_get_infrared;
 
     static QMutex m_ni_mutex;
+    QMutex m_device_mutex;
 };
 
 typedef OpenniGrabber NiteRGBDGrabber;
